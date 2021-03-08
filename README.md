@@ -17,8 +17,10 @@ Charge low fees to merchant as opposed to traditional credit card payment fees, 
 Privacy, Using Zilswap users could connect their cold wallet and swap their coins into XSGD and make purchases online, once eth - zil bridge has been complete more users could use their tokens for purchases online, therefore details of user would not be available to merchants only public wallet address which is not considered PII as opposed to Credit Card details.
 
 API shall be looped to constantly check for user transaction matching XSGD wallet, Merchant address, and Transaction being successful
+<br>
 ![image](https://user-images.githubusercontent.com/53926665/110338561-1ad13280-8062-11eb-8901-c35d571a720b.png)
 
 In the event that the latest transaction is not XSGD, we would not clear the transaction
+<br>
 ![API Transaction if no XSGD](https://user-images.githubusercontent.com/53926665/110338654-39372e00-8062-11eb-8836-b20dea29ed13.PNG)
 
