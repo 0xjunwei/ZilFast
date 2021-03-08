@@ -1,2 +1,2 @@
-# Zilpayment
-Zilliqa Payment Service
+# ZilFast
+A proposed Zilliqa Payment Service
