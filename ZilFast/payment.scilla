@@ -1,0 +1,189 @@
+scilla_version 0
+
+(*Utils*)
+import BoolUtils
+
+
+library PaymentService
+
+let one_msg =
+  fun (msg: Message) =>
+  let nil_msg = Nil {Message} in
+  Cons {Message} msg nil_msg
+  
+let two_msgs =
+fun (msg1 : Message) =>
+fun (msg2 : Message) =>
+  let msgs_tmp = one_msg msg2 in
+  Cons {Message} msg1 msgs_tmp
+  
+let fst =
+  tfun 'A =>
+  tfun 'B =>
+  fun (p : Pair ('A) ('B)) =>
+    match p with
+    | Pair a b => a
+    end
+  
+(* Error events *)
+type Error =
+| CodeIsNotOwner
+| CodeContractPaused
+| CodeMerchantIDexists
+| CodeMerchantIDnotFound
+| CodeWrongAmountPaid
+| CodeNotXSGD
+
+let make_error =
+  fun (result : Error) =>
+    let result_code = 
+      match result with
+      | CodeIsNotOwner => Int32 -1
+      | CodeContractPaused => Int32 -2
+      | CodeMerchantIDexists => Int32 -3
+      | CodeMerchantIDnotFound => Int32 -4
+      | CodeWrongAmountPaid => Int32 -5
+      | CodeNotXSGD => Int32 -6
+      end
+    in
+    { _exception : "Error"; code : result_code }
+  
+
+contract PaymentServices(
+  initial_owner : ByStr20,
+  initial_xsgd_address: ByStr20
+)
+
+field owner : ByStr20 = initial_owner
+field xsgd_address : ByStr20 = initial_xsgd_address
+
+field merchantID : Map Int32 ByStr20 = Emp Int32 ByStr20
+
+field pendingXSGD : Map ByStr20 (Map ByStr20 Int32) = Emp ByStr20 (Map ByStr20 Int32)
+
+field pauseContract : Bool = False
+
+procedure ThrowError(err : Error)
+  e = make_error err;
+  throw e
+end
+
+procedure isOwner(sender: ByStr20)
+  ownerAddr <- owner;
+  isOwner = builtin eq ownerAddr sender;
+  match isOwner with
+    | False =>
+      e = CodeIsNotOwner;
+      ThrowError e
+    | True =>
+  end
+end
+
+procedure IsPaused()
+  paused_tmp <- pauseContract;
+  match paused_tmp with
+    | False =>
+    | True =>
+      e = CodeContractPaused;
+      ThrowError e
+  end
+end
+
+transition addMerchants(merchantId: Int32, merchantAddress: ByStr20)
+  isOwner _sender;
+  merchantIDexists <- exists merchantID[merchantId];
+  match merchantIDexists with
+    | True =>
+      err = CodeMerchantIDexists;
+      ThrowError err
+    | False =>
+      merchantID[merchantId] := merchantAddress;
+      event_merchant_added = { _eventname: "addMerchant"; merchantID: merchantId };
+      event event_merchant_added
+  end
+end
+
+transition removeMerchant(merchantId: Int32)
+  isOwner _sender;
+  merchantIDexists <- exists merchantID[merchantId];
+  match merchantIDexists with
+    | True =>
+      delete merchantID[merchantId];
+      event_merchant_removed = { _eventname: "removedMerchant"; merchantID: merchantId };
+      event event_merchant_removed
+    | False =>
+      err = CodeMerchantIDnotFound;
+      ThrowError err
+  end
+end
+
+transition paymentInZil(merchantId: Int32, amount: Uint128, transactionId: Int32)
+  checkMerchant <- merchantID[merchantId];
+  match checkMerchant with
+    | None =>
+      err = CodeMerchantIDnotFound;
+      ThrowError err
+    | Some checkMerchant =>
+      paidAmount = _amount;
+      isCorrect = builtin eq paidAmount amount;
+      match isCorrect with
+        | False =>
+          err = CodeWrongAmountPaid;
+          ThrowError err
+        | True =>
+          accept;
+          msg  = {_tag : ""; _recipient : checkMerchant; _amount : amount;
+                  code : transactionId};
+          msgs = one_msg msg;
+          send msgs
+      end
+  end
+end
+
+transition paymentInXSGD(merchantId: Int32, amount: Uint128, transactionId: Int32)
+  checkMerchant <- merchantID[merchantId];
+  match checkMerchant with
+    | None =>
+      err = CodeMerchantIDnotFound;
+      ThrowError err
+    | Some checkMerchant =>
+      xsgdAddr <- xsgd_address;
+      pendingXSGD[checkMerchant][_sender] := transactionId;
+      msg  = {_tag : "TransferFrom"; _recipient : xsgdAddr; _amount : Uint128 0;
+              from: _sender; to: checkMerchant; amount: amount};
+      msgs = one_msg msg;
+      send msgs
+  end
+end
+
+transition TransferFromSuccessCallBack (
+  initiator : ByStr20,
+  sender : ByStr20,
+  recipient : ByStr20,
+  amount : Uint128
+)
+  xsgdAddr <- xsgd_address;
+  xsgdTokenSent = builtin eq xsgdAddr _sender;
+  match xsgdTokenSent with
+    | False =>
+      err = CodeNotXSGD;
+      ThrowError err
+    | True =>
+      transactionId <- pendingXSGD[recipient][sender];
+      match transactionId with
+        | None =>
+          (*No pending*)
+          err = CodeWrongAmountPaid;
+          ThrowError err
+        | Some transactionId =>
+          delete pendingXSGD[sender];
+          msg  = {_tag : ""; _recipient : recipient; _amount : amount;
+                  code : transactionId};
+          msgs = one_msg msg;
+          send msgs
+      end
+  end
+end
+
+
+
