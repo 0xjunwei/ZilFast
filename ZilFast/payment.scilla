@@ -3,7 +3,6 @@ scilla_version 0
 (*Utils*)
 import BoolUtils
 
-
 library PaymentService
 
 let one_msg =
@@ -16,15 +15,7 @@ fun (msg1 : Message) =>
 fun (msg2 : Message) =>
   let msgs_tmp = one_msg msg2 in
   Cons {Message} msg1 msgs_tmp
-  
-let fst =
-  tfun 'A =>
-  tfun 'B =>
-  fun (p : Pair ('A) ('B)) =>
-    match p with
-    | Pair a b => a
-    end
-  
+
 (* Error events *)
 type Error =
 | CodeIsNotOwner
@@ -60,6 +51,8 @@ field xsgd_address : ByStr20 = initial_xsgd_address
 field merchantID : Map Int32 ByStr20 = Emp Int32 ByStr20
 
 field pendingXSGD : Map ByStr20 (Map ByStr20 Int32) = Emp ByStr20 (Map ByStr20 Int32)
+field idToAmount : Map Int32 Uint128 = Emp Int32 Uint128
+
 
 field pauseContract : Bool = False
 
@@ -149,6 +142,7 @@ transition paymentInXSGD(merchantId: Int32, amount: Uint128, transactionId: Int3
     | Some checkMerchant =>
       xsgdAddr <- xsgd_address;
       pendingXSGD[checkMerchant][_sender] := transactionId;
+      idToAmount[transactionId] := amount;
       msg  = {_tag : "TransferFrom"; _recipient : xsgdAddr; _amount : Uint128 0;
               from: _sender; to: checkMerchant; amount: amount};
       msgs = one_msg msg;
@@ -176,14 +170,26 @@ transition TransferFromSuccessCallBack (
           err = CodeWrongAmountPaid;
           ThrowError err
         | Some transactionId =>
-          delete pendingXSGD[sender];
-          msg  = {_tag : ""; _recipient : recipient; _amount : amount;
-                  code : transactionId};
-          msgs = one_msg msg;
-          send msgs
+          amountPaid <- idToAmount[transactionId];
+          match amountPaid with
+            | None =>
+            | Some amountPaid =>
+              isCorrect = builtin eq amountPaid amount;
+              match isCorrect with
+                | False =>
+                  delete pendingXSGD[sender];
+                  delete idToAmount[transactionId];
+                  err = CodeWrongAmountPaid;
+                  ThrowError err
+                | True =>
+                  delete pendingXSGD[sender];
+                  delete idToAmount[transactionId];
+                  msg  = {_tag : ""; _recipient : recipient; _amount : amount;
+                          code : transactionId};
+                  msgs = one_msg msg;
+                  send msgs
+              end
+          end
       end
   end
 end
-
-
-
