@@ -1,5 +1,6 @@
 scilla_version 0
 (*Developed by Lim Jun Wei for ZilHive Education Practicum. https://github.com/junwei2012*)
+(*Proof of Concept of XSGD Based payments *)
 (*Utils*)
 import BoolUtils
 
