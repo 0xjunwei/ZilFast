@@ -1,5 +1,11 @@
 # ZilFast
 A proposed Zilliqa Payment Service
+MainNet:
+https://viewblock.io/zilliqa/address/zil1sze55mz3l90uur0ru7p9nuc37ew6cspp8tspsw
+
+TestNet:
+Testnet XSGD : https://devex.zilliqa.com/address/0x26c3dac15b1b3c2a5c8b1a7cf33655a88cea7423?network=https://dev-api.zilliqa.com
+Testnet Payments: https://devex.zilliqa.com/address/0x3c359154b936e5f39f6e73879e453b68677dac42?network=https://dev-api.zilliqa.com
 
 <strong>Motivation</strong>
 <br>
