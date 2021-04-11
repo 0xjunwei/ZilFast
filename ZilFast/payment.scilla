@@ -1,5 +1,5 @@
 scilla_version 0
-
+(*Developed by Lim Jun Wei for ZilHive Education Practicum. https://github.com/junwei2012*)
 (*Utils*)
 import BoolUtils
 
@@ -16,6 +16,9 @@ fun (msg1 : Message) =>
 fun (msg2 : Message) =>
   let msgs_tmp = one_msg msg2 in
   Cons {Message} msg1 msgs_tmp
+
+let true = True
+let false = False
 
 (* Error events *)
 type Error =
@@ -47,13 +50,12 @@ contract PaymentServices(
 )
 
 field owner : ByStr20 = initial_owner
+field pending_owner : Option ByStr20 = None {ByStr20}
 field xsgd_address : ByStr20 = initial_xsgd_address
 
 field merchantID : Map Int32 ByStr20 = Emp Int32 ByStr20
-
 field pendingXSGD : Map ByStr20 (Map ByStr20 Int32) = Emp ByStr20 (Map ByStr20 Int32)
 field idToAmount : Map Int32 Uint128 = Emp Int32 Uint128
-
 
 field pauseContract : Bool = False
 
@@ -194,5 +196,52 @@ transition TransferFromSuccessCallBack (
               end
           end
       end
+  end
+end
+
+
+transition changeXSGDaddress(newAddress: ByStr20)
+  isOwner _sender;
+  xsgd_address := newAddress;
+  event_xsgd_changed = { _eventname: "changedXSGDaddress"; address: newAddress };
+  event event_xsgd_changed
+end
+
+transition pauseContract()
+  isOwner _sender;
+  pauseStatus <- pauseContract;
+  match pauseStatus with
+    | True =>
+      pauseContract := false
+    | False =>
+      pauseContract := true
+  end
+end
+
+
+
+(*Change Contract Owner*)
+transition RequestOwnershipTransfer(new_owner : ByStr20)
+  isOwner _sender;
+  po = Some {ByStr20} new_owner;
+  pending_owner := po
+end
+
+transition ConfirmOwnershipTransfer()
+  optional_po <- pending_owner;
+  match optional_po with
+  | Some optional_po =>
+      caller_is_new_owner = builtin eq _sender optional_po;
+      match caller_is_new_owner with
+      | True =>
+          (* transfer ownership *)
+          owner := optional_po;
+          none = None {ByStr20};
+          pending_owner := none
+      | False => (* the caller is not the new owner, do nothing*)
+        err = CodeIsNotOwner;
+        ThrowError err
+      end
+  | None => (* ownership transfer is not in-progress, do nothing *)
   end
 end
