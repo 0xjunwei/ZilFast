@@ -3,6 +3,7 @@ scilla_version 0
 (*Utils*)
 import BoolUtils
 
+
 library PaymentService
 
 let one_msg =
@@ -111,6 +112,7 @@ transition removeMerchant(merchantId: Int32)
 end
 
 transition paymentInZil(merchantId: Int32, amount: Uint128, transactionId: Int32)
+  IsPaused;
   checkMerchant <- merchantID[merchantId];
   match checkMerchant with
     | None =>
@@ -126,7 +128,7 @@ transition paymentInZil(merchantId: Int32, amount: Uint128, transactionId: Int32
         | True =>
           accept;
           msg  = {_tag : ""; _recipient : checkMerchant; _amount : amount;
-                  code : transactionId};
+                  code : transactionId; paid: paidAmount};
           msgs = one_msg msg;
           send msgs
       end
@@ -134,6 +136,7 @@ transition paymentInZil(merchantId: Int32, amount: Uint128, transactionId: Int32
 end
 
 transition paymentInXSGD(merchantId: Int32, amount: Uint128, transactionId: Int32)
+  IsPaused;
   checkMerchant <- merchantID[merchantId];
   match checkMerchant with
     | None =>
@@ -177,15 +180,15 @@ transition TransferFromSuccessCallBack (
               isCorrect = builtin eq amountPaid amount;
               match isCorrect with
                 | False =>
-                  delete pendingXSGD[sender];
+                  delete pendingXSGD[recipient][sender];
                   delete idToAmount[transactionId];
                   err = CodeWrongAmountPaid;
                   ThrowError err
                 | True =>
-                  delete pendingXSGD[sender];
+                  delete pendingXSGD[recipient][sender];
                   delete idToAmount[transactionId];
-                  msg  = {_tag : ""; _recipient : recipient; _amount : amount;
-                          code : transactionId};
+                  msg  = {_tag : ""; _recipient : recipient; _amount : Uint128 0;
+                          code : transactionId; paid: amount};
                   msgs = one_msg msg;
                   send msgs
               end
